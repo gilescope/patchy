@@ -1,6 +1,7 @@
 use {
     regex::Regex,
     std::path::Path,
+    std::process::Command,
     std::{fs::File, fs::OpenOptions, io::Write},
     walkdir::WalkDir,
 };
@@ -33,7 +34,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Ok(out)
     };
-    let mut out = if std::env::current_dir().unwrap().file_name() == Some("cumulus".as_ref()) {
+
+    let is_cumulus = std::env::current_dir().unwrap().file_name() == Some("cumulus".as_ref());
+    let mut out = if is_cumulus {
         process("polkadot")?
     } else {
         String::new()
@@ -48,6 +51,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .open("./Cargo.toml")
         .expect("Failed to open file");
     file.write_all(out.as_bytes()).unwrap();
+
+    let output = Command::new("cargo")
+        .args(&["update", "-p", "sp-io"])
+        .output()
+        .expect("Failed to execute command");
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        println!("Command executed successfully:\n{}", stdout);
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        println!("Command failed:\n{}", stderr);
+    }
+
+    if is_cumulus {
+        let output = Command::new("cargo")
+            .args(&["update", "-p", "polkadot-primitives"])
+            .output()
+            .expect("Failed to execute command");
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            println!("Command executed successfully:\n{}", stdout);
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            println!("Command failed:\n{}", stderr);
+        }
+    }
 
     Ok(())
 }
