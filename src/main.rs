@@ -2,7 +2,7 @@ use {
     regex::Regex,
     std::path::Path,
     std::process::Command,
-    std::{fs::File, fs::OpenOptions, io::Write},
+    std::{fs::OpenOptions, io::Write},
     walkdir::WalkDir,
 };
 
@@ -11,6 +11,7 @@ const TGT: &str = "target";
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let re = Regex::new(r#"name\s*=\s*"(.+?)""#)?;
     let is_target = |e: &Path| e.ancestors().any(|f| f.file_name() == Some(TGT.as_ref()));
+    let is_cumulus = std::env::current_dir().unwrap().file_name() == Some("cumulus".as_ref());
 
     let process = |project: &str| -> Result<String, Box<dyn std::error::Error>> {
         let mut out = String::new();
@@ -35,7 +36,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(out)
     };
 
-    let is_cumulus = std::env::current_dir().unwrap().file_name() == Some("cumulus".as_ref());
+    if is_cumulus {
+        let polkadot_cargo_toml = std::fs::read_to_string("../polkadot/Cargo.toml")
+            .expect("can't find polkadot sibling dir");
+        if !polkadot_cargo_toml.contains("[patch.\"https://github.com/paritytech/substrate\"]") {
+            println!("Please patch the polkadot dir first.");
+            std::process::exit(1);
+        }
+    }
+
     let mut out = if is_cumulus {
         process("polkadot")?
     } else {
